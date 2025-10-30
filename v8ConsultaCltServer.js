@@ -81,7 +81,7 @@ async function autenticarV8() {
 
 function EmailComNumeroAleatorio(pessoa) {
     var numeroAleatorio = Math.floor(Math.random() * 100000);
-    return (pessoa.nome[0] + numeroAleatorio + "@gmail.com").toLowerCase();
+    return (pessoa.nome.split(' ')[0] + numeroAleatorio + "@gmail.com").toLowerCase();
 }
 
 async function gerarTermo(accessToken, pessoa) {
@@ -99,7 +99,7 @@ async function gerarTermo(accessToken, pessoa) {
         gender: sexoVerificado,
         birthDate: dataNascimentoFormatadaAnoMesDia,
         signerName: pessoa.nome || "NOME DESCONHECIDO",
-        signerEmail: emailValido,
+        signerEmail: emailValido  || "sememail@gmail.com",
         signerPhone: { phoneNumber: numeroSemDDD, countryCode: "55", areaCode: apenasDDD },
         provider: "QI"
     };
@@ -221,3 +221,4 @@ app.post("/simular", async (req, res) => {
 
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => console.log(`🚀 Server rodando`));
+
