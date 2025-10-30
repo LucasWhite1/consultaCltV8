@@ -193,7 +193,8 @@ app.post("/simular", async (req, res) => {
 
 
 /** ==================== INICIAR SERVER ==================== */
-app.listen(PORT, () => console.log(`🚀 Server rodando em http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server rodando`));
+
 
 
 
