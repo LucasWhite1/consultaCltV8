@@ -9,8 +9,8 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const TOKEN_UTILITARIOS = process.env.API_TOKEN_UTILITARIOS || "213132123564564897894564564";
 const V8_CREDENTIALS = {
-    username: "jlnn.333ba@gmail.com",
-    password: "Nova@2023",
+    username: process.env.V8_USERNAME,
+    password: process.env.V8_PASSWORD,
     client_id: "DHWogdaYmEI8n5bwwxPDzulMlSK7dwIn"
 };
 const V8_BASE = "https://bff.v8sistema.com";
@@ -194,4 +194,5 @@ app.post("/simular", async (req, res) => {
 
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => console.log(`🚀 Server rodando em http://localhost:${PORT}`));
+
 
