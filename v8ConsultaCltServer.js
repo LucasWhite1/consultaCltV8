@@ -79,17 +79,31 @@ async function autenticarV8() {
     return V8_TOKEN;
 }
 
+function EmailComNumeroAleatorio(pessoa) {
+    var numeroAleatorio = Math.floor(Math.random() * 100000);
+    return (pessoa.nome[0] + numeroAleatorio + "@gmail.com").toLowerCase();
+}
+
 async function gerarTermo(accessToken, pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
+    var emailValido = pessoa.email && pessoa.email.includes("@") ? pessoa.email : EmailComNumeroAleatorio(pessoa);
+
+
+    var sexoVerificado = pessoa.sexo == "F" ? "female" : "male";
+    var numeroSemDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(-9) : '999999999';
+    var apenasDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(0, -9) : '71';
+    var dataNascimentoFormatadaAnoMesDia = pessoa.dtNascimento.split('/').reverse().join('-');
+
     const body = {
         borrowerDocumentNumber: pessoa.cpf,
-        gender: pessoa.gender || "male",
-        birthDate: pessoa.birthDate || "1991-01-01",
-        signerName: pessoa.name || "NOME DESCONHECIDO",
-        signerEmail: pessoa.email || "email@teste.com",
-        signerPhone: { phoneNumber: pessoa.phone || "999999999", countryCode: "55", areaCode: pessoa.areaCode || "71" },
+        gender: sexoVerificado,
+        birthDate: dataNascimentoFormatadaAnoMesDia,
+        signerName: pessoa.nome || "NOME DESCONHECIDO",
+        signerEmail: emailValido,
+        signerPhone: { phoneNumber: numeroSemDDD, countryCode: "55", areaCode: apenasDDD },
         provider: "QI"
     };
+    console.log(body)
     const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
     console.log(`✅ Termo gerado: ${res.data.id}`);
     return res.data.id;
@@ -207,8 +221,3 @@ app.post("/simular", async (req, res) => {
 
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => console.log(`🚀 Server rodando`));
-
-
-
-
-
