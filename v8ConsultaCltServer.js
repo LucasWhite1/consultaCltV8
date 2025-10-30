@@ -7,7 +7,7 @@ app.use(express.json());
 
 /** ==================== CONFIGURAÇÕES ==================== */
 const PORT = process.env.PORT || 3000;
-const TOKEN_UTILITARIOS = process.env.API_TOKEN_UTILITARIOS || "213132123564564897894564564";
+const TOKEN_UTILITARIOS = process.env.API_TOKEN_UTILITARIOS;
 const V8_CREDENTIALS = {
     username: process.env.V8_USERNAME,
     password: process.env.V8_PASSWORD,
@@ -194,5 +194,6 @@ app.post("/simular", async (req, res) => {
 
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => console.log(`🚀 Server rodando em http://localhost:${PORT}`));
+
 
 
