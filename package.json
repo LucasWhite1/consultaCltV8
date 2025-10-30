@@ -1,0 +1,13 @@
+{
+  "name": "v8-simulador",
+  "version": "1.0.0",
+  "main": "v8ConsultaCltServer.js",
+  "scripts": {
+    "start": "node v8ConsultaCltServer.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.1",
+    "express": "^4.21.2",
+    "qs": "^6.12.2"
+  }
+}
