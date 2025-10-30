@@ -3,10 +3,23 @@ const axios = require("axios");
 const qs = require("qs");
 
 const app = express();
+const cors = require("cors");
+
+// Permitir qualquer origem
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], allowedHeaders: ["Content-Type", "Authorization"] }));
+
+
 app.use(express.json());
 
+// ✅ Liberar CORS para qualquer origem
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 /** ==================== CONFIGURAÇÕES ==================== */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3050;
 const TOKEN_UTILITARIOS = process.env.API_TOKEN_UTILITARIOS;
 const V8_CREDENTIALS = {
     username: process.env.V8_USERNAME,
@@ -194,6 +207,7 @@ app.post("/simular", async (req, res) => {
 
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => console.log(`🚀 Server rodando`));
+
 
 
 
