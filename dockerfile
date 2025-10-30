@@ -14,7 +14,8 @@ RUN npm install --production
 COPY . .
 
 # Exponha a porta do servidor (deve ser a mesma que seu app usa)
-EXPOSE 3000
+EXPOSE 3050
 
 # Comando padrão para iniciar o app
 CMD ["node", "v8ConsultaCltServer.js"]
+
