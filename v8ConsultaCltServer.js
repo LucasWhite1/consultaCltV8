@@ -164,6 +164,8 @@ async function gerarTermo(pessoa) {
         throw new Error(`Data de nascimento inválida ou ausente para CPF ${pessoa.cpf}`);
     }
 
+    console.log()
+
     const body = {
         borrowerDocumentNumber: pessoa.cpf,
         gender: pessoa.sexo === "F" ? "female" : "male",
@@ -336,6 +338,8 @@ app.post("/simular", async (req, res) => {
     const clientUtilitarios = createClientUtilitarios(TOKEN_UTILITARIOS);
 
     const pessoa = await getPessoaByCPF(clientUtilitarios, cpfFormatado);
+
+    console.log('RESULTADO DA API DE PUXAR DADOS DO CLIENTE:'+pessoa)
     if (!pessoa) return res.status(404).json({ erro: `CPF ${cpfFormatado} não encontrado` });
 
     const tokenV8 = await autenticarV8();
@@ -400,6 +404,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
