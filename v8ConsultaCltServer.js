@@ -138,22 +138,43 @@ function EmailComNumeroAleatorio(pessoa) {
     return (pessoa.nome.split(' ')[0] + numeroAleatorio + "@gmail.com").toLowerCase();
 }
 
+function formatarDataNascimento(data) {
+    if (!data) return null;
+
+    // aceita DD/MM/YYYY
+    if (data.includes('/')) {
+        return data.split('/').reverse().join('-');
+    }
+
+    // já está no formato correto
+    if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+        return data;
+    }
+
+    return null;
+}
+
+
 async function gerarTermo(pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
-    var emailValido = pessoa.email && pessoa.email.includes("@") ? pessoa.email : EmailComNumeroAleatorio(pessoa);
 
-    var sexoVerificado = pessoa.sexo == "F" ? "female" : "male";
-    var numeroSemDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(-9) : '999999999';
-    var apenasDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(0, -9) : '71';
-    var dataNascimentoFormatadaAnoMesDia = pessoa.dtNascimento.split('/').reverse().join('-');
+    const dataNascimento = formatarDataNascimento(pessoa.dtNascimento);
+
+    if (!dataNascimento) {
+        throw new Error(`Data de nascimento inválida ou ausente para CPF ${pessoa.cpf}`);
+    }
 
     const body = {
         borrowerDocumentNumber: pessoa.cpf,
-        gender: sexoVerificado,
-        birthDate: dataNascimentoFormatadaAnoMesDia,
+        gender: pessoa.sexo === "F" ? "female" : "male",
+        birthDate: dataNascimento,
         signerName: pessoa.nome || "NOME DESCONHECIDO",
-        signerEmail: emailValido || "sememail@gmail.com",
-        signerPhone: { phoneNumber: numeroSemDDD, countryCode: "55", areaCode: apenasDDD },
+        signerEmail: pessoa.email || "sememail@gmail.com",
+        signerPhone: {
+            phoneNumber: pessoa.celular1?.replace(/\D/g, '').slice(-9) || '999999999',
+            countryCode: "55",
+            areaCode: pessoa.celular1?.replace(/\D/g, '').slice(0, -9) || '71'
+        },
         provider: "QI"
     };
 
@@ -164,6 +185,7 @@ async function gerarTermo(pessoa) {
     console.log("✅ Termo gerado:", res.data.id);
     return res.data.id;
 }
+
 
 
 async function autorizarTermo(accessToken, consultId) {
@@ -378,6 +400,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
