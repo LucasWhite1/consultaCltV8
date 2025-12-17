@@ -51,10 +51,15 @@ async function getPessoaByCPF(client, cpf) {
 }
 
 function formatarCPF(cpf) {
-    if (!cpf) return "";
+    if (cpf === null || cpf === undefined) return "";
+
+    // força para string antes de usar replace
+    cpf = String(cpf);
+
     cpf = cpf.replace(/\D/g, "");
     return cpf.padStart(11, "0");
 }
+
 
 /** ==================== CLIENTE V8 ==================== */
 let tokenV8  = null;
@@ -407,6 +412,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
