@@ -316,7 +316,7 @@ async function aguardarMargem(token, cpfFormatado, consultId) {
       if (margemData.margem > 0 && prontoStatuses.includes(margemData.status)) {
         console.log(`✅ Margem disponível e status ${margemData.status} aceito para prosseguir: ${margemData.margem}`);
         return margemData;
-      } else if (margemData.status === "REJECTED") {
+      } else if (margemData.status === "REJECTED" || margemData.status === "FAILED") {
         console.error("❌ Termo foi rejeitado. Encerrando polling.");
         return null;
       } else {
@@ -407,6 +407,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
