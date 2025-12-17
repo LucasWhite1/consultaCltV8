@@ -339,7 +339,8 @@ app.post("/simular", async (req, res) => {
 
     const pessoa = await getPessoaByCPF(clientUtilitarios, cpfFormatado);
 
-    console.log('RESULTADO DA API DE PUXAR DADOS DO CLIENTE:'+ json.stringfy(pessoa))
+    console.log('RESULTADO DA API DE PUXAR DADOS DO CLIENTE:')
+    console.log(pessoa)
     if (!pessoa) return res.status(404).json({ erro: `CPF ${cpfFormatado} não encontrado` });
 
     const tokenV8 = await autenticarV8();
@@ -404,6 +405,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
