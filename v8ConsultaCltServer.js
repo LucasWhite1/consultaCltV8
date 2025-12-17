@@ -25,6 +25,7 @@ const V8_CREDENTIALS = {
     password: process.env.V8_PASSWORD,
     client_id: "DHWogdaYmEI8n5bwwxPDzulMlSK7dwIn"
 };
+
 const V8_BASE = "https://bff.v8sistema.com";
 
 /** ==================== CLIENTE UTILITÁRIOS ==================== */
@@ -138,25 +139,24 @@ async function axiosV8(method, url, body = null) {
 
 
 
-function EmailComNumeroAleatorio(pessoa) {
-    var numeroAleatorio = Math.floor(Math.random() * 100000);
-    return (pessoa.nome.split(' ')[0] + numeroAleatorio + "@gmail.com").toLowerCase();
-}
+// function EmailComNumeroAleatorio(pessoa) {
+//     var numeroAleatorio = Math.floor(Math.random() * 100000);
+//     return (pessoa.nome.split(' ')[0] + numeroAleatorio + "@gmail.com").toLowerCase();
+// }
 
 function formatarDataNascimento(data) {
     if (!data) return null;
-    console.log(0000000000)
+
 
     // aceita DD/MM/YYYY
     if (data.includes('/')) {
         return data.split('/').reverse().join('-');
     }
-    console.log(1111111111)
     // já está no formato correto
     if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
         return data;
     }
-    console.log(2222222222)
+    
 
     return null;
 }
@@ -212,11 +212,14 @@ async function obterMargemPorId(accessToken, cpf, consultId) {
         endDate: new Date(agora.setHours(23, 59, 59, 999)).toISOString(),
         limit: 50,
         page: 1,
-        search: cpf,
+        search: cpf, // se tirar aqui vai trazer de todo mundo !!!
         provider: "QI"
     };
 
     const res = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, params });
+
+    console.log(`🔎 Resultado da busca de termos para CPF ${cpf}:`, res.data); // aqui tem as ultimas pesquisas !!!
+
     const termos = res.data.data || [];
     console.log(`🔎 Termos retornados na busca (contagem=${termos.length})`);
     termos.forEach((t, idx) => {
@@ -233,7 +236,8 @@ async function obterMargemPorId(accessToken, cpf, consultId) {
     return {
         termId: termo.id,
         margem: parseFloat(termo.availableMarginValue),
-        status: termo.status // se a API retornar status
+        status: termo.status, // se a API retornar status
+        description: termo.description 
     };
 }
 
@@ -241,12 +245,22 @@ async function consultarTaxas(accessToken) {
     const url = `${V8_BASE}/private-consignment/simulation/configs`;
     const res = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     console.log(res.data)
-    return res.data.configs?.[0];
+    return res.data.configs;
 }
 
-async function criarSimulacao(accessToken, consultId, config, margemDisponivel) {
+async function criarSimulacao(accessToken, consultId, config, margemDisponivel,erroSeguro = false) {
   const url = `${V8_BASE}/private-consignment/simulation`;
 
+  var objetoConfig = config;
+
+
+
+  if (erroSeguro) {
+    config = config[1]
+    console.log("Usando configuração sem seguro:", config)
+  } else{
+    config = config[0]
+  }
   // Pega as opções de parcelas disponíveis e ordena do maior para o menor
   const parcelasOptions = (config.number_of_installments || [])
     .map(n => parseInt(n, 10))
@@ -298,6 +312,11 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel) 
         console.log(`⚠️ Erro com parcelas=${parcelas}, tentando próxima opção...`);
         continue;
       } else {
+       
+        if (err.response?.data?.title?.includes('não possui seguro')) {
+            console.log("⚠️ Erro de seguro inativo, tentando sem seguro...");
+            return criarSimulacao(accessToken, consultId, objetoConfig, margemDisponivel, true);
+        }
         console.error("❌ Erro não esperado ao criar simulação:", err.response?.data || err.message);
         return null;
       }
@@ -317,16 +336,18 @@ async function aguardarMargem(token, cpfFormatado, consultId) {
   for (let i = 0; i < maxTentativas; i++) {
     const margemData = await obterMargemPorId(token, cpfFormatado, consultId);
     if (margemData) {
+        
       console.log(`Status atual do termo: ${margemData.status}, margem=${margemData.margem}`);
       if (margemData.margem > 0 && prontoStatuses.includes(margemData.status)) {
         console.log(`✅ Margem disponível e status ${margemData.status} aceito para prosseguir: ${margemData.margem}`);
         return margemData;
       } else if (margemData.status === "REJECTED" || margemData.status === "FAILED") {
         console.error("❌ Termo foi rejeitado. Encerrando polling.");
-        return null;
+        return margemData.description;
       } else {
         console.log(`⚠️ Status ${margemData.status} não é considerado pronto. Continuando a esperar...`);
       }
+
     } else {
       console.log("⏳ Sem margem ainda (termo não encontrado).");
     }
@@ -342,6 +363,7 @@ app.post("/simular", async (req, res) => {
     if (!cpf) return res.status(400).json({ erro: "CPF não fornecido" });
 
     const cpfFormatado = formatarCPF(cpf);
+    console.log(TOKEN_UTILITARIOS)
     const clientUtilitarios = createClientUtilitarios(TOKEN_UTILITARIOS);
 
     const pessoa = await getPessoaByCPF(clientUtilitarios, cpfFormatado);
@@ -372,11 +394,16 @@ app.post("/simular", async (req, res) => {
             return res.status(504).json({ erro: "Margem não disponível após polling" });
         }
 
+        if (typeof margemData === "string") {
+            console.error("❌ Erro na obtenção da margem:", margemData);
+            return res.status(400).json({ erro: margemData });
+        }
+
         console.log("margemData:", margemData);
 
         // Agora pode buscar as taxas e criar a simulação
         const config = await consultarTaxas(tokenV8);
-        console.log("💠 Config obtido:", config);
+        console.log("💠 Config obtido:", config[0]);
 
         // Tenta criar a simulação com várias parcelas até funcionar
         const simulacao = await criarSimulacao(tokenV8, margemData.termId, config, margemData.margem);
@@ -405,20 +432,4 @@ app.post("/simular", async (req, res) => {
 /** ==================== INICIAR SERVER ==================== */
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
-    // setInterval(() =>{
-    //     if (tokenV8 != null){
-    //         tokenV8 = null
-    //         console.log("Token setado para null") // Isso é pra renovar o token a cada 1 hora
-    //     }
-    // },3600000)
 });
-
-
-
-
-
-
-
-
-
-
