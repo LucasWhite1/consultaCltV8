@@ -140,22 +140,24 @@ function EmailComNumeroAleatorio(pessoa) {
 
 function formatarDataNascimento(data) {
     if (!data) return null;
+    console.log(0000000000)
 
     // aceita DD/MM/YYYY
     if (data.includes('/')) {
         return data.split('/').reverse().join('-');
     }
-
+    console.log(1111111111)
     // já está no formato correto
     if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
         return data;
     }
+    console.log(2222222222)
 
     return null;
 }
 
 
-async function gerarTermo(pessoa) {
+async function gerarTermo(tokenV8, pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
 
     const dataNascimento = formatarDataNascimento(pessoa.dtNascimento);
@@ -405,6 +407,7 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
 
