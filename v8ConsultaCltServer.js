@@ -360,7 +360,7 @@ app.post("/simular", async (req, res) => {
         });
     } catch (err) {
         console.error("❌ Erro geral na operação:", err);
-        tokenV8 = null
+        // tokenV8 = null
         return res.status(500).json({ erro: err.message });
     }
 });
@@ -376,4 +376,5 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
