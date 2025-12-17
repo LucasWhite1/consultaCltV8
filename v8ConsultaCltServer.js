@@ -140,18 +140,20 @@ function EmailComNumeroAleatorio(pessoa) {
 
 async function gerarTermo(pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
+    var emailValido = pessoa.email && pessoa.email.includes("@") ? pessoa.email : EmailComNumeroAleatorio(pessoa);
+
+    var sexoVerificado = pessoa.sexo == "F" ? "female" : "male";
+    var numeroSemDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(-9) : '999999999';
+    var apenasDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(0, -9) : '71';
+    var dataNascimentoFormatadaAnoMesDia = pessoa.dtNascimento.split('/').reverse().join('-');
 
     const body = {
         borrowerDocumentNumber: pessoa.cpf,
-        gender: pessoa.sexo == "F" ? "female" : "male",
-        birthDate: pessoa.dtNascimento.split('/').reverse().join('-'),
+        gender: sexoVerificado,
+        birthDate: dataNascimentoFormatadaAnoMesDia,
         signerName: pessoa.nome || "NOME DESCONHECIDO",
-        signerEmail: pessoa.email || "sememail@gmail.com",
-        signerPhone: {
-            phoneNumber: pessoa.celular1?.replace(/\D/g, '').slice(-9) || '999999999',
-            countryCode: "55",
-            areaCode: pessoa.celular1?.replace(/\D/g, '').slice(0, -9) || '71'
-        },
+        signerEmail: emailValido || "sememail@gmail.com",
+        signerPhone: { phoneNumber: numeroSemDDD, countryCode: "55", areaCode: apenasDDD },
         provider: "QI"
     };
 
@@ -376,5 +378,6 @@ app.listen(PORT, () => {
     //     }
     // },3600000)
 });
+
 
 
