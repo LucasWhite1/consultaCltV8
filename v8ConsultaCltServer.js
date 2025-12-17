@@ -57,55 +57,112 @@ function formatarCPF(cpf) {
 }
 
 /** ==================== CLIENTE V8 ==================== */
-let V8_TOKEN = null;
+let tokenV8  = null;
+let autenticando = null;
 
 async function autenticarV8() {
-    if (V8_TOKEN) return V8_TOKEN; // reutiliza token
-    const url = "https://auth.v8sistema.com/oauth/token";
-    const data = {
-        grant_type: "password",
-        username: V8_CREDENTIALS.username,
-        password: V8_CREDENTIALS.password,
-        audience: V8_BASE,
-        scope: "offline_access",
-        client_id: V8_CREDENTIALS.client_id
-    };
-    const response = await axios.post(url, qs.stringify(data), {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" }
-    });
-    V8_TOKEN = response.data.access_token;
-    console.log("✅ Token V8 obtido!");
-    return V8_TOKEN;
+    if (tokenV8) {
+        return tokenV8;
+    }
+
+    // evita 10 requisições pedindo token ao mesmo tempo
+    if (autenticando) {
+        return autenticando;
+    }
+
+    autenticando = (async () => {
+        const url = "https://auth.v8sistema.com/oauth/token";
+
+        const data = {
+            grant_type: "password",
+            username: V8_CREDENTIALS.username,
+            password: V8_CREDENTIALS.password,
+            audience: V8_BASE,
+            scope: "offline_access",
+            client_id: V8_CREDENTIALS.client_id
+        };
+
+        const response = await axios.post(
+            url,
+            qs.stringify(data),
+            { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+        );
+
+        tokenV8 = response.data.access_token;
+        console.log("✅ Token V8 obtido!");
+        autenticando = null;
+        return tokenV8;
+    })();
+
+    return autenticando;
 }
+
+async function axiosV8(method, url, body = null) {
+    try {
+        const token = await autenticarV8();
+
+        return await axios({
+            method,
+            url,
+            data: body,
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+    } catch (err) {
+        if (err.response?.status === 401) {
+            console.warn("🔑 Token V8 expirado. Renovando...");
+
+            tokenV8 = null; // invalida
+            const novoToken = await autenticarV8();
+
+            return await axios({
+                method,
+                url,
+                data: body,
+                headers: {
+                    Authorization: `Bearer ${novoToken}`
+                }
+            });
+        }
+
+        throw err;
+    }
+}
+
+
 
 function EmailComNumeroAleatorio(pessoa) {
     var numeroAleatorio = Math.floor(Math.random() * 100000);
     return (pessoa.nome.split(' ')[0] + numeroAleatorio + "@gmail.com").toLowerCase();
 }
 
-async function gerarTermo(accessToken, pessoa) {
+async function gerarTermo(pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
-    var emailValido = pessoa.email && pessoa.email.includes("@") ? pessoa.email : EmailComNumeroAleatorio(pessoa);
-
-    var sexoVerificado = pessoa.sexo == "F" ? "female" : "male";
-    var numeroSemDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(-9) : '999999999';
-    var apenasDDD = pessoa.celular1 ? pessoa.celular1.replace(/\D/g, '').slice(0, -9) : '71';
-    var dataNascimentoFormatadaAnoMesDia = pessoa.dtNascimento.split('/').reverse().join('-');
 
     const body = {
         borrowerDocumentNumber: pessoa.cpf,
-        gender: sexoVerificado,
-        birthDate: dataNascimentoFormatadaAnoMesDia,
+        gender: pessoa.sexo == "F" ? "female" : "male",
+        birthDate: pessoa.dtNascimento.split('/').reverse().join('-'),
         signerName: pessoa.nome || "NOME DESCONHECIDO",
-        signerEmail: emailValido || "sememail@gmail.com",
-        signerPhone: { phoneNumber: numeroSemDDD, countryCode: "55", areaCode: apenasDDD },
+        signerEmail: pessoa.email || "sememail@gmail.com",
+        signerPhone: {
+            phoneNumber: pessoa.celular1?.replace(/\D/g, '').slice(-9) || '999999999',
+            countryCode: "55",
+            areaCode: pessoa.celular1?.replace(/\D/g, '').slice(0, -9) || '71'
+        },
         provider: "QI"
     };
+
     console.log("🧭 Enviando dados do termo:", body);
-    const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
-    console.log(`✅ Termo gerado: ${res.data.id}`);
+
+    const res = await axiosV8("POST", url, body);
+
+    console.log("✅ Termo gerado:", res.data.id);
     return res.data.id;
 }
+
 
 async function autorizarTermo(accessToken, consultId) {
     const url = `${V8_BASE}/private-consignment/consult/${consultId}/authorize`;
@@ -262,6 +319,7 @@ app.post("/simular", async (req, res) => {
     try {
         console.log("🔔 Iniciando fluxo de simulação CLT para CPF:", cpfFormatado);
 
+        
         // 1) Gerar termo
         const termoId = await gerarTermo(tokenV8, pessoa);
         console.log("✅ Termo gerado:", termoId);
@@ -302,10 +360,20 @@ app.post("/simular", async (req, res) => {
         });
     } catch (err) {
         console.error("❌ Erro geral na operação:", err);
+        tokenV8 = null
         return res.status(500).json({ erro: err.message });
     }
 });
 
 
 /** ==================== INICIAR SERVER ==================== */
-app.listen(PORT, () => console.log(`🚀 Server rodando`));
+app.listen(PORT, () => {
+    console.log(`🚀 Server rodando`)
+    // setInterval(() =>{
+    //     if (tokenV8 != null){
+    //         tokenV8 = null
+    //         console.log("Token setado para null") // Isso é pra renovar o token a cada 1 hora
+    //     }
+    // },3600000)
+});
+
