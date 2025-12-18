@@ -423,6 +423,16 @@ app.post("/simular", async (req, res) => {
         });
     } catch (err) {
         console.error("❌ Erro geral na operação:", err);
+
+         if (err.response?.data?.message) {
+            return res.status(500).json({ erro: err.response?.data?.message });
+        }
+
+
+        if (err.response?.data?.detail) {
+            return res.status(500).json({ erro: err.response?.data.detail });
+        }
+        
         // tokenV8 = null
         return res.status(500).json({ erro: err.message });
     }
@@ -433,3 +443,4 @@ app.post("/simular", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
