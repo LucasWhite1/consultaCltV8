@@ -63,26 +63,25 @@ function formatarCPF(cpf) {
 
 
 /** ==================== CLIENTE V8 ==================== */
-let tokenV8  = null;
-let autenticando = null;
+const tokensV8 = {};
+const autenticandoV8 = {};
 
-async function autenticarV8() {
-    if (tokenV8) {
-        return tokenV8;
+async function autenticarV8(usuario) {
+    if (tokensV8[usuario]) {
+        return tokensV8[usuario];
     }
 
-    // evita 10 requisições pedindo token ao mesmo tempo
-    if (autenticando) {
-        return autenticando;
+    if (autenticandoV8[usuario]) {
+        return autenticandoV8[usuario];
     }
 
-    autenticando = (async () => {
+    autenticandoV8[usuario] = (async () => {
         const url = "https://auth.v8sistema.com/oauth/token";
 
         const data = {
             grant_type: "password",
-            username: V8_CREDENTIALS.username,
-            password: V8_CREDENTIALS.password,
+            username: process.env[`V8_USERNAME_${usuario}`],
+            password: process.env[`V8_PASSWORD_${usuario}`],
             audience: V8_BASE,
             scope: "offline_access",
             client_id: V8_CREDENTIALS.client_id
@@ -94,18 +93,19 @@ async function autenticarV8() {
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
         );
 
-        tokenV8 = response.data.access_token;
-        console.log("✅ Token V8 obtido!");
-        autenticando = null;
-        return tokenV8;
+        tokensV8[usuario] = response.data.access_token;
+        autenticandoV8[usuario] = null;
+
+        console.log(`✅ Token V8 obtido para usuário ${usuario}`);
+        return tokensV8[usuario];
     })();
 
-    return autenticando;
+    return autenticandoV8[usuario];
 }
 
-async function axiosV8(method, url, body = null) {
+async function axiosV8(usuario, method, url, body = null) {
     try {
-        const token = await autenticarV8();
+        const token = await autenticarV8(usuario);
 
         return await axios({
             method,
@@ -118,10 +118,10 @@ async function axiosV8(method, url, body = null) {
 
     } catch (err) {
         if (err.response?.status === 401) {
-            console.warn("🔑 Token V8 expirado. Renovando...");
+            console.warn(`🔑 Token expirado (${usuario}). Renovando...`);
 
-            tokenV8 = null; // invalida
-            const novoToken = await autenticarV8();
+            tokensV8[usuario] = null;
+            const novoToken = await autenticarV8(usuario);
 
             return await axios({
                 method,
@@ -162,7 +162,7 @@ function formatarDataNascimento(data) {
 }
 
 
-async function gerarTermo(tokenV8, pessoa) {
+async function gerarTermo(usuario, pessoa) {
     const url = `${V8_BASE}/private-consignment/consult`;
 
     const dataNascimento = formatarDataNascimento(pessoa.dtNascimento);
@@ -189,7 +189,7 @@ async function gerarTermo(tokenV8, pessoa) {
 
     console.log("🧭 Enviando dados do termo:", body);
 
-    const res = await axiosV8("POST", url, body);
+    const res = await axiosV8(usuario, "POST", url, body);
 
     console.log("✅ Termo gerado:", res.data.id);
     return res.data.id;
@@ -248,83 +248,83 @@ async function consultarTaxas(accessToken) {
     return res.data.configs;
 }
 
-async function criarSimulacao(accessToken, consultId, config, margemDisponivel,erroSeguro = false) {
-  const url = `${V8_BASE}/private-consignment/simulation`;
+async function criarSimulacao(accessToken, consultId, config, margemDisponivel, erroSeguro = false) {
+    const url = `${V8_BASE}/private-consignment/simulation`;
 
-  var objetoConfig = config;
+    var objetoConfig = config;
 
 
 
-  if (erroSeguro) {
-    config = config[1]
-    console.log("Usando configuração sem seguro:", config)
-  } else{
-    config = config[0]
-  }
-  // Pega as opções de parcelas disponíveis e ordena do maior para o menor
-  const parcelasOptions = (config.number_of_installments || [])
-    .map(n => parseInt(n, 10))
-    .filter(n => !isNaN(n))
-    .sort((a, b) => b - a); // ← maior para menor
-
-  const VALOR_MAXIMO = 25000;
-  const MIN_DISBURSE = 800; // desembolso mínimo permitido pela API (conforme seu log)
-
-  for (let i = 0; i < parcelasOptions.length; i++) {
-    const parcelas = parcelasOptions[i];
-
-    // O valor por parcela não pode exceder a margem disponível
-    // e o total desembolado não pode exceder o teto.
-    const perInstallment = Math.min(margemDisponivel, VALOR_MAXIMO / parcelas);
-    const totalDisbursed = perInstallment * parcelas;
-
-    // Se o desembolso total for menor que o mínimo, pula para a próxima opção
-    if (totalDisbursed < MIN_DISBURSE) {
-      console.log(`🛑 Desembolso total ${totalDisbursed.toFixed(2)} abaixo do mínimo (${MIN_DISBURSE}) para ${parcelas} parcelas. Pulando...`);
-      continue;
+    if (erroSeguro) {
+        config = config[1]
+        console.log("Usando configuração sem seguro:", config)
+    } else {
+        config = config[0]
     }
+    // Pega as opções de parcelas disponíveis e ordena do maior para o menor
+    const parcelasOptions = (config.number_of_installments || [])
+        .map(n => parseInt(n, 10))
+        .filter(n => !isNaN(n))
+        .sort((a, b) => b - a); // ← maior para menor
 
-    const body = {
-      consult_id: consultId,
-      config_id: config.id,
-      installment_face_value: perInstallment,
-      number_of_installments: parcelas
-      // provider: "QI" // opcional, adicione se o seu endpoint exigir
-    };
+    const VALOR_MAXIMO = 25000;
+    const MIN_DISBURSE = 800; // desembolso mínimo permitido pela API (conforme seu log)
 
-    console.log(`🔎 Tentando simulação com parcelas=${parcelas}, installment_face_value=${perInstallment.toFixed(2)}`);
-    try {
-      const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
-      console.log("✅ Simulação criada com sucesso:", res.data);
-      return {
-        valor_solicitado: totalDisbursed,
-        numero_parcelas: parcelas,
-        valor_parcela: res.data.installment_value,
-        valor_cliente_recebe: res.data.disbursed_issue_amount,
-        cet: res.data.disbursement_option?.cet,
-        detalhes: res.data
-      };
-    } catch (err) {
-      const titulo = (err.response?.data?.title || "").toLowerCase();
-      // Se for erro relacionado à parcela/margem, tenta a próxima opção
-      if (titulo.includes("installment") || titulo.includes("margin") || titulo.includes("above") ||
-          titulo.includes("minimum") || titulo.includes("under")) {
-        console.log(`⚠️ Erro com parcelas=${parcelas}, tentando próxima opção...`);
-        continue;
-      } else {
-       
-        if (err.response?.data?.title?.includes('não possui seguro')) {
-            console.log("⚠️ Erro de seguro inativo, tentando sem seguro...");
-            return criarSimulacao(accessToken, consultId, objetoConfig, margemDisponivel, true);
+    for (let i = 0; i < parcelasOptions.length; i++) {
+        const parcelas = parcelasOptions[i];
+
+        // O valor por parcela não pode exceder a margem disponível
+        // e o total desembolado não pode exceder o teto.
+        const perInstallment = Math.min(margemDisponivel, VALOR_MAXIMO / parcelas);
+        const totalDisbursed = perInstallment * parcelas;
+
+        // Se o desembolso total for menor que o mínimo, pula para a próxima opção
+        if (totalDisbursed < MIN_DISBURSE) {
+            console.log(`🛑 Desembolso total ${totalDisbursed.toFixed(2)} abaixo do mínimo (${MIN_DISBURSE}) para ${parcelas} parcelas. Pulando...`);
+            continue;
         }
-        console.error("❌ Erro não esperado ao criar simulação:", err.response?.data || err.message);
-        return null;
-      }
-    }
-  }
 
-  console.error("❌ Todas as opções de parcelas falharam na simulação.");
-  return null;
+        const body = {
+            consult_id: consultId,
+            config_id: config.id,
+            installment_face_value: perInstallment,
+            number_of_installments: parcelas
+            // provider: "QI" // opcional, adicione se o seu endpoint exigir
+        };
+
+        console.log(`🔎 Tentando simulação com parcelas=${parcelas}, installment_face_value=${perInstallment.toFixed(2)}`);
+        try {
+            const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
+            console.log("✅ Simulação criada com sucesso:", res.data);
+            return {
+                valor_solicitado: totalDisbursed,
+                numero_parcelas: parcelas,
+                valor_parcela: res.data.installment_value,
+                valor_cliente_recebe: res.data.disbursed_issue_amount,
+                cet: res.data.disbursement_option?.cet,
+                detalhes: res.data
+            };
+        } catch (err) {
+            const titulo = (err.response?.data?.title || "").toLowerCase();
+            // Se for erro relacionado à parcela/margem, tenta a próxima opção
+            if (titulo.includes("installment") || titulo.includes("margin") || titulo.includes("above") ||
+                titulo.includes("minimum") || titulo.includes("under")) {
+                console.log(`⚠️ Erro com parcelas=${parcelas}, tentando próxima opção...`);
+                continue;
+            } else {
+
+                if (err.response?.data?.title?.includes('não possui seguro')) {
+                    console.log("⚠️ Erro de seguro inativo, tentando sem seguro...");
+                    return criarSimulacao(accessToken, consultId, objetoConfig, margemDisponivel, true);
+                }
+                console.error("❌ Erro não esperado ao criar simulação:", err.response?.data || err.message);
+                return null;
+            }
+        }
+    }
+
+    console.error("❌ Todas as opções de parcelas falharam na simulação.");
+    return null;
 }
 
 
@@ -359,35 +359,39 @@ async function aguardarMargem(token, cpfFormatado, consultId) {
 
 /** ==================== ROTA POST ==================== */
 app.post("/simular", async (req, res) => {
-    const { cpf } = req.body;
-    if (!cpf) return res.status(400).json({ erro: "CPF não fornecido" });
+    const { cpf, usuario } = req.body;
+
+    if (!cpf || !usuario) {
+        return res.status(400).json({ erro: "CPF e usuário são obrigatórios" });
+    }
+
 
     const cpfFormatado = formatarCPF(cpf);
-    console.log(TOKEN_UTILITARIOS)
+    // console.log(TOKEN_UTILITARIOS)F
     const clientUtilitarios = createClientUtilitarios(TOKEN_UTILITARIOS);
 
     const pessoa = await getPessoaByCPF(clientUtilitarios, cpfFormatado);
 
-    console.log('RESULTADO DA API DE PUXAR DADOS DO CLIENTE:')
-    console.log(pessoa)
+    // console.log('RESULTADO DA API DE PUXAR DADOS DO CLIENTE:')
+    // console.log(pessoa)
     if (!pessoa) return res.status(404).json({ erro: `CPF ${cpfFormatado} não encontrado` });
 
-    const tokenV8 = await autenticarV8();
+     const tokenV8 = await autenticarV8(usuario);
 
     try {
         console.log("🔔 Iniciando fluxo de simulação CLT para CPF:", cpfFormatado);
 
-        
+
         // 1) Gerar termo
-        const termoId = await gerarTermo(tokenV8, pessoa);
-        console.log("✅ Termo gerado:", termoId);
+        const termoId = await gerarTermo(usuario, pessoa);
+        // console.log("✅ Termo gerado:", termoId);
 
         // 2) Autorizar termo
         await autorizarTermo(tokenV8, termoId);
         console.log("✅ Termo autorizado");
 
         // 3) Polling da margem usando o consultId do termo criado
-        console.log("🏁 Iniciando polling de margem com consultId:", termoId);
+        // console.log("🏁 Iniciando polling de margem com consultId:", termoId);
         const margemData = await aguardarMargem(tokenV8, cpfFormatado, termoId);
         if (!margemData) {
             console.error("❌ Margem não ficou disponível dentro do tempo esperado.");
@@ -399,7 +403,7 @@ app.post("/simular", async (req, res) => {
             return res.status(400).json({ erro: margemData });
         }
 
-        console.log("margemData:", margemData);
+        // console.log("margemData:", margemData);
 
         // Agora pode buscar as taxas e criar a simulação
         const config = await consultarTaxas(tokenV8);
@@ -410,7 +414,7 @@ app.post("/simular", async (req, res) => {
 
         if (!simulacao) {
             console.error("❌ Falha ao criar a simulação com todas as parcelas disponíveis.");
-            return res.status(500).json({ erro: "Cliente com saldo menor que R$ 800" });
+            return res.status(500).json({ erro: "Falha ao criar a simulação" });
         }
 
         // 6) Retornar o valor que entra na conta
@@ -422,19 +426,21 @@ app.post("/simular", async (req, res) => {
             cet: simulacao?.cet
         });
     } catch (err) {
-        console.error("❌ Erro geral na operação:", err);
+        // console.error("❌ Erro geral na operação:", err);
+        console.error("❌ Erro na operação:");
 
-         if (err.response?.data?.message) {
+        // console.log(err.response?.data?.message)
+
+        if (err.response?.data?.message) {
             return res.status(500).json({ erro: err.response?.data?.message });
         }
 
 
-        if (err.response?.data?.detail) {
+        if (err.response?.data.detail) {
             return res.status(500).json({ erro: err.response?.data.detail });
         }
-        
-        // tokenV8 = null
-        return res.status(500).json({ erro: err.message });
+        // // tokensV8 = null
+        // return res.status(500).json({ erro: err.message });
     }
 });
 
@@ -443,5 +449,6 @@ app.post("/simular", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
