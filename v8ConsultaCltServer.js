@@ -410,7 +410,7 @@ app.post("/simular", async (req, res) => {
 
         if (!simulacao) {
             console.error("❌ Falha ao criar a simulação com todas as parcelas disponíveis.");
-            return res.status(500).json({ erro: "Falha ao criar a simulação" });
+            return res.status(500).json({ erro: "Cliente com saldo menor que R$ 800" });
         }
 
         // 6) Retornar o valor que entra na conta
@@ -443,4 +443,5 @@ app.post("/simular", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
