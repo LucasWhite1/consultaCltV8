@@ -357,8 +357,119 @@ async function aguardarMargem(token, cpfFormatado, consultId) {
   return null;
 }
 
-/** ==================== ROTA POST ==================== */
+
+// ROTA SIMULAR
 app.post("/simular", async (req, res) => {
+  const { cpf, usuario } = req.body;
+
+  if (!cpf || !usuario) {
+    return res.status(400).json({ erro: "CPF e usuário são obrigatórios" });
+  }
+
+  const cpfFormatado = formatarCPF(cpf);
+  const clientUtilitarios = createClientUtilitarios(TOKEN_UTILITARIOS);
+  const pessoa = await getPessoaByCPF(clientUtilitarios, cpfFormatado);
+
+  if (!pessoa) {
+    return res.status(404).json({ erro: "CPF não encontrado" });
+  }
+
+  try {
+    const tokenV8 = await autenticarV8(usuario);
+
+    // 1) Gera termo
+    const consultId = await gerarTermo(usuario, pessoa);
+
+    // 2) Autoriza
+    await autorizarTermo(tokenV8, consultId);
+
+    console.log("🚀 Simulação iniciada:", consultId);
+
+    return res.json({
+      sucesso: true,
+      consultId,
+      mensagem: "Simulação iniciada com sucesso"
+    });
+
+  } catch (err) {
+    console.error("❌ Erro ao iniciar simulação:", err.response?.data || err.message);
+    return res.status(500).json({ erro: "Erro ao iniciar simulação" });
+  }
+});
+
+// ROTA CONSULTA
+
+app.post("/consultar-simulacoes", async (req, res) => {
+  const { cpf, usuario, consultId } = req.body;
+
+  if (!cpf || !usuario || !consultId) {
+    return res.status(400).json({ erro: "CPF, usuário e consultId são obrigatórios" });
+  }
+
+  const cpfFormatado = formatarCPF(cpf);
+
+  try {
+    const tokenV8 = await autenticarV8(usuario);
+
+    // 1) Consulta margem do termo
+    const margemData = await obterMargemPorId(tokenV8, cpfFormatado, consultId);
+
+    if (!margemData) {
+      return res.json({
+        status: "AGUARDANDO",
+        mensagem: "Simulação ainda não processada"
+      });
+    }
+
+    if (margemData.status === "REJECTED" || margemData.status === "FAILED") {
+      return res.json({
+        status: margemData.status,
+        mensagem: margemData.description || "Simulação rejeitada"
+      });
+    }
+
+    if (margemData.margem <= 0) {
+      return res.json({
+        status: margemData.status,
+        margem: margemData.margem,
+        mensagem: "Sem margem disponível"
+      });
+    }
+
+    // 2) Tem margem → tenta simular
+    const configs = await consultarTaxas(tokenV8);
+    const simulacao = await criarSimulacao(
+      tokenV8,
+      margemData.termId,
+      configs,
+      margemData.margem
+    );
+
+    if (!simulacao) {
+      return res.json({
+        status: "SEM_SIMULACAO",
+        mensagem: "Não foi possível gerar simulação"
+      });
+    }
+
+    return res.json({
+      status: "SUCESSO",
+      margem: margemData.margem,
+      simulacao
+    });
+
+  } catch (err) {
+    console.error("❌ Erro ao consultar simulação:", err.response?.data || err.message);
+    return res.status(500).json({ erro: "Erro ao consultar simulação" });
+  }
+});
+
+
+
+
+
+/** ==================== ROTA POST ==================== */
+app.post("/simularCompleto", async (req, res) => {
     const { cpf, usuario } = req.body;
 
     if (!cpf || !usuario) {
@@ -449,6 +560,7 @@ app.post("/simular", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
 
