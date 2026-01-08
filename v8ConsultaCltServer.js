@@ -270,6 +270,8 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel, 
     const VALOR_MAXIMO = 25000;
     const MIN_DISBURSE = 800; // desembolso mínimo permitido pela API (conforme seu log)
 
+    // return console.log('parou aqui')
+
     for (let i = 0; i < parcelasOptions.length; i++) {
         const parcelas = parcelasOptions[i];
 
@@ -294,7 +296,9 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel, 
 
         console.log(`🔎 Tentando simulação com parcelas=${parcelas}, installment_face_value=${perInstallment.toFixed(2)}`);
         try {
+            
             const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
+            // return res.data;
             console.log("✅ Simulação criada com sucesso:", res.data);
             return {
                 valor_solicitado: totalDisbursed,
@@ -306,9 +310,10 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel, 
             };
         } catch (err) {
             const titulo = (err.response?.data?.title || "").toLowerCase();
+            // return console.log(titulo)
             // Se for erro relacionado à parcela/margem, tenta a próxima opção
             if (titulo.includes("installment") || titulo.includes("margin") || titulo.includes("above") ||
-                titulo.includes("minimum") || titulo.includes("under")) {
+                titulo.includes("minimum") || titulo.includes("under") || titulo.includes("maior que o permitido"))  {
                 console.log(`⚠️ Erro com parcelas=${parcelas}, tentando próxima opção...`);
                 continue;
             } else {
@@ -560,6 +565,7 @@ app.post("/simularCompleto", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
 
