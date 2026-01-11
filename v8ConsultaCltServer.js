@@ -5,6 +5,8 @@ const qs = require("qs");
 const app = express();
 const cors = require("cors");
 
+app.set('trust proxy', 1);
+
 // Permitir qualquer origem
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], allowedHeaders: ["Content-Type", "Authorization"] }));
 
@@ -565,6 +567,7 @@ app.post("/simularCompleto", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
 
