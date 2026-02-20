@@ -279,7 +279,7 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel, 
 
         // O valor por parcela não pode exceder a margem disponível
         // e o total desembolado não pode exceder o teto.
-        const perInstallment = Math.min(margemDisponivel, VALOR_MAXIMO / parcelas);
+        const perInstallment = margemDisponivel;
         const totalDisbursed = perInstallment * parcelas;
 
         // Se o desembolso total for menor que o mínimo, pula para a próxima opção
@@ -301,10 +301,13 @@ async function criarSimulacao(accessToken, consultId, config, margemDisponivel, 
             
             const res = await axios.post(url, body, { headers: { Authorization: `Bearer ${accessToken}` } });
             // return res.data;
+            if (res.data.number_of_installments !== parcelas) {
+               console.log("⚠️ API ajustou o número de parcelas");
+                }
             console.log("✅ Simulação criada com sucesso:", res.data);
             return {
                 valor_solicitado: totalDisbursed,
-                numero_parcelas: parcelas,
+                numero_parcelas: res.data.number_of_installments,
                 valor_parcela: res.data.installment_value,
                 valor_cliente_recebe: res.data.disbursed_issue_amount,
                 cet: res.data.disbursement_option?.cet,
@@ -572,6 +575,7 @@ app.post("/simularCompleto", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
 
