@@ -420,6 +420,7 @@ app.post("/consultar-simulacoes", async (req, res) => {
 
     // 1) Consulta margem do termo
     const margemData = await obterMargemPorId(tokenV8, cpfFormatado, consultId);
+      console.log("VARIAVEL MARGEMDATA PARA DEBUG: "+margemData)
 
     if (!margemData) {
       return res.json({
@@ -451,6 +452,8 @@ app.post("/consultar-simulacoes", async (req, res) => {
       configs,
       margemData.margem
     );
+
+      console.log("VARIAVEL SIMULACAO PARA DEBUG: "+ simulacao);
 
     if (!simulacao) {
       return res.json({
@@ -567,6 +570,7 @@ app.post("/simularCompleto", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server rodando`)
 });
+
 
 
 
